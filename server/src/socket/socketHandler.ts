@@ -67,6 +67,23 @@ const socketHandler = (io: Server): void => {
             });
         });
 
+        socket.on("send-reaction", ({ roomId, userName, reaction }) => {
+            console.log(`1 :${userName} sent reaction: ${reaction} in room ${roomId}`);
+            socket.to(roomId).emit("receive-reaction", {
+                userName,
+                reaction,
+            });
+            console.log(`${userName} sent reaction: ${reaction} in room ${roomId}`);
+        });
+
+        socket.on("leave-meeting", ({ roomId }) => {
+            socket.leave(roomId);
+
+            socket.to(roomId).emit("user-left");
+
+            console.log("User left room:", roomId);
+        });
+
         socket.on("disconnect", () => {
             logger(`Client disconnected: ${socket.id}`);
         });

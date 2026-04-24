@@ -8,8 +8,10 @@ import {
     MonitorUp,
     MonitorOff,
     Hand,
-    MessageSquare
+    MessageSquare,
+    Smile
 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 type Props = {
     isMuted: boolean;
@@ -23,6 +25,7 @@ type Props = {
     leaveMeeting: () => void;
     raiseHand: () => void;
     toggleChat: () => void;
+    sendReaction: (emoji: string) => void;
     unreadCount?: number;
 };
 
@@ -38,12 +41,57 @@ const MeetingControls = ({
     leaveMeeting,
     raiseHand,
     toggleChat,
+    sendReaction,
     unreadCount = 0,
 }: Props) => {
+    const [showReactions, setShowReactions] = useState(false);
+    const popupRef = useRef<HTMLDivElement | null>(null);
+
+    const reactions = ["👍", "😂", "👏", "❤️", "😮", "🥳"];
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (
+                popupRef.current &&
+                !popupRef.current.contains(event.target as Node)
+            ) {
+                setShowReactions(false);
+            }
+        };
+
+        if (showReactions) {
+            document.addEventListener("mousedown", handleClickOutside);
+        }
+
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [showReactions]);
+
     return (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50">
-            <div className="flex items-center gap-4 px-6 py-4 rounded-3xl bg-black/70 backdrop-blur-xl border border-sky-400/20 shadow-2xl">
+            {/* Reaction Popup */}
+            {showReactions && (
+                <div ref={popupRef} className="absolute bottom-20 left-1/2 -translate-x-1/2
+                bg-slate-900/95 backdrop-blur-xl border border-slate-700
+                rounded-2xl px-4 py-3 shadow-2xl
+                flex gap-3 animate-in fade-in zoom-in duration-200">
 
+                    {reactions.map((emoji, index) => (
+                        <button
+                            key={index}
+                            onClick={() => {
+                                sendReaction(emoji);
+                            }}
+                            className="text-2xl hover:scale-125 transition duration-200
+                            hover:bg-slate-800 rounded-xl p-2"
+                        >
+                            {emoji}
+                        </button>
+                    ))}
+                </div>
+            )}
+            <div className="flex items-center gap-4 px-6 py-4 rounded-3xl bg-black/70 backdrop-blur-xl border border-sky-400/20 shadow-2xl">
                 <button
                     onClick={toggleMic}
                     className="px-5 py-3 rounded-2xl bg-slate-800 text-white hover:bg-slate-700 transition"
@@ -92,6 +140,14 @@ const MeetingControls = ({
                     title="Raise Hand"
                 >
                     <Hand className="text-white" size={22} />
+                </button>
+
+                {/* Reaction Button */}
+                <button
+                    onClick={() => setShowReactions((prev) => !prev)}
+                    className="p-3 rounded-full bg-slate-800 hover:bg-slate-700 transition"
+                >
+                    <Smile size={18} />
                 </button>
 
                 <div className="relative" onClick={toggleChat}>

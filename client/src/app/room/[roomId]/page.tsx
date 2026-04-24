@@ -37,10 +37,13 @@ const RoomPage = () => {
     const [isTyping, setIsTyping] = useState(false);
     const [unreadCount, setUnreadCount] = useState(0);
     const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
+    const reactionAudioRef = useRef<HTMLAudioElement | null>(null);
+    const [reaction, setReaction] = useState("");
 
     //Initialize audio for new message notification
     useEffect(() => {
         notificationAudioRef.current = new Audio("/sounds/dragon-studio-notification-sound-effect-372475.mp3");
+        reactionAudioRef.current = new Audio("/sounds/soundreality-notification-center-443093.mp3");
     }, []);
 
     // Setup Peer
@@ -178,6 +181,35 @@ const RoomPage = () => {
             }
         });
 
+        socket.on('receive-reaction', ({ userName, reaction }) => {
+            console.log(`${userName} sent reaction: ${reaction}`);
+            setReaction(`${userName} reacted with ${reaction}`);
+
+            if (reactionAudioRef.current) {
+                reactionAudioRef.current.currentTime = 0;
+
+                reactionAudioRef.current.play().catch((err) => {
+                    console.log("Reaction Audio play blocked:", err);
+                });
+            }
+
+            setTimeout(() => {
+                setReaction("");
+            }, 3000);
+        });
+
+        socket.on("user-left", () => {
+            console.log("Remote user left");
+
+            setRemoteStream(null);
+            setRemoteUserName("");
+
+            if (peerRef.current) {
+                peerRef.current.close();
+                peerRef.current = null;
+            }
+        });
+
         return () => {
             socket.off("user-joined");
             socket.off("receive-offer");
@@ -185,8 +217,10 @@ const RoomPage = () => {
             socket.off("user-raised-hand");
             socket.off("receive-message");
             socket.off("user-typing");
+            socket.off("receive-reaction");
+            socket.off("user-left");
         };
-    }, [roomId, localStream, localUserName, isChatOpen]);
+    }, [roomId, localStream, localUserName, isChatOpen, reaction]);
 
     // Join room
     useEffect(() => {
@@ -225,7 +259,9 @@ const RoomPage = () => {
         if (peerRef.current) {
             peerRef.current.close();
         }
-
+        socket.emit("leave-meeting", {
+            roomId,
+        });
         socket.disconnect();
 
         window.location.href = "/";
@@ -331,12 +367,29 @@ const RoomPage = () => {
         });
     };
 
+    const sendReaction = (emoji: string) => {
+        socket.emit("send-reaction", {
+            roomId,
+            userName: localUserName,
+            reaction: emoji,
+        });
+        console.log("Reaction sent:", emoji);
+    }
+
     return (
         <div className="w-full h-screen bg-gray-950 flex overflow-hidden">
             {/* Hand Raised Message */}
             {handRaisedMessage && (
                 <div className="absolute top-6 left-1/2 -translate-x-1/2 z-[999] bg-white text-black px-6 py-3 rounded-2xl font-semibold shadow-xl">
                     {handRaisedMessage}
+                </div>
+            )}
+            {/* Reaction Popup */}
+            {reaction && (
+                <div className="absolute top-20 left-1/2 -translate-x-1/2 z-[999] 
+                    bg-white text-black px-6 py-3 rounded-2xl font-semibold shadow-xl
+                    text-xl animate-bounce">
+                    {reaction}
                 </div>
             )}
 
@@ -347,12 +400,13 @@ const RoomPage = () => {
             >
                 <RemoteVideo
                     remoteStream={remoteStream}
-                    remoteUserName={remoteUserName || "Participant"}
+                    remoteUserName={remoteUserName}
+                    roomId={roomId}
                 />
 
                 <LocalVideo
                     setLocalStream={setLocalStream}
-                    userName={`You (${localUserName || "Guest"})`}
+                    userName={`You (${localUserName})`}
                 />
 
                 <MeetingControls
@@ -380,6 +434,7 @@ const RoomPage = () => {
                     raiseHand={raiseHand}
                     unreadCount={unreadCount}
                     isChatOpened={isChatOpen}
+                    sendReaction={sendReaction}
                 />
             </div>
 
