@@ -9,6 +9,7 @@ import { createPeerConnection } from "@/src/services/peer";
 import RemoteVideo from "@/src/components/RemoteVideo";
 import MeetingControls from "@/src/components/MeetingControls";
 import ChatDrawer from "@/src/components/ChatDrawer";
+import { processAudioWithRNNoise } from "@/src/utils/noiseCancellation";
 
 const RoomPage = () => {
     useSocket();
@@ -39,6 +40,8 @@ const RoomPage = () => {
     const notificationAudioRef = useRef<HTMLAudioElement | null>(null);
     const reactionAudioRef = useRef<HTMLAudioElement | null>(null);
     const [reaction, setReaction] = useState("");
+    const dataChannelRef = useRef<RTCDataChannel | null>(null);
+    const [isNoiseCancellationOn, setIsNoiseCancellationOn] = useState(true);
 
     //Initialize audio for new message notification
     useEffect(() => {
@@ -70,6 +73,30 @@ const RoomPage = () => {
             console.log("Remote track received:", event.streams[0]);
         };
 
+        // Listen for incoming DataChannel (for second user) using pure WebRTC channel without socket
+        peer.ondatachannel = (event) => {
+            console.log("DataChannel received:", event.channel.label);
+
+            const channel = event.channel;
+            dataChannelRef.current = channel;
+
+            channel.onopen = () => {
+                console.log("DataChannel opened");
+            }
+
+            channel.onmessage = (event) => {
+                console.log("DataChannel message received:", event.data);
+                const data = JSON.parse(event.data);
+
+                if (data.type === "raise-hand") {
+                    setHandRaisedMessage(`${data.userName} raised hand ✋`);
+                    setTimeout(() => {
+                        setHandRaisedMessage("");
+                    }, 3000);
+                }
+            }
+        };
+
         console.log("Peer connection created");
 
         return () => {
@@ -77,11 +104,64 @@ const RoomPage = () => {
         };
     }, [localStream]);
 
+    useEffect(() => {
+        if (!localStream || !peerRef.current) return;
+
+        const newAudioTrack =
+            localStream.getAudioTracks()[0];
+
+        const audioSender =
+            peerRef.current
+                .getSenders()
+                .find(
+                    (sender) =>
+                        sender.track?.kind === "audio"
+                );
+
+        if (audioSender && newAudioTrack) {
+            audioSender
+                .replaceTrack(newAudioTrack)
+                .then(() => {
+                    console.log(
+                        "Audio track replaced successfully"
+                    );
+                })
+                .catch((err) => {
+                    console.error(
+                        "replaceTrack error:",
+                        err
+                    );
+                });
+        }
+    }, [localStream]);
+
     // socket listeners
     useEffect(() => {
         socket.on("user-joined", async ({ userName }) => {
             if (!peerRef.current) return;
             setRemoteUserName(userName);
+
+            // Implementing direct WebRTC channel
+            const channel = peerRef.current.createDataChannel("meeting-actions");
+            dataChannelRef.current = channel;
+
+            channel.onopen = () => {
+                console.log("DataChannel opened");
+            };
+
+            channel.onmessage = (event) => {
+                console.log("DataChannel message received:", event.data);
+
+                const data = JSON.parse(event.data);
+
+                if (data.type === "raise-hand") {
+                    setHandRaisedMessage(`${data.userName} raised hand ✋`);
+
+                    setTimeout(() => {
+                        setHandRaisedMessage("");
+                    }, 3000);
+                }
+            }
 
             console.log("User joined → creating offer");
 
@@ -136,14 +216,14 @@ const RoomPage = () => {
             console.log("P2P connection established");
         });
 
-        socket.on("user-raised-hand", ({ userName }) => {
-            console.log(`${userName} raised hand`);
-            setHandRaisedMessage(`${userName} raised hand ✋`);
+        // socket.on("user-raised-hand", ({ userName }) => {
+        //     console.log(`${userName} raised hand`);
+        //     setHandRaisedMessage(`${userName} raised hand ✋`);
 
-            setTimeout(() => {
-                setHandRaisedMessage("");
-            }, 3000);
-        });
+        //     setTimeout(() => {
+        //         setHandRaisedMessage("");
+        //     }, 3000);
+        // });
 
         socket.on("receive-message", ({ userName, message, time }) => {
             console.log(`Message received from ${userName}: ${message}`);
@@ -214,7 +294,7 @@ const RoomPage = () => {
             socket.off("user-joined");
             socket.off("receive-offer");
             socket.off("receive-answer");
-            socket.off("user-raised-hand");
+            // socket.off("user-raised-hand");
             socket.off("receive-message");
             socket.off("user-typing");
             socket.off("receive-reaction");
@@ -326,13 +406,25 @@ const RoomPage = () => {
         }
     }
 
-    const raiseHand = () => {
-        socket.emit("raise-hand", {
-            roomId,
-            userName: localUserName,
-        });
+    // const raiseHand = () => {
+    //     socket.emit("raise-hand", {
+    //         roomId,
+    //         userName: localUserName,
+    //     });
 
-        console.log("Hand raised");
+    //     console.log("Hand raised");
+    // };
+    // WebRTC DataChannel implementation for raise hand action
+    const raiseHand = () => {
+        if (dataChannelRef.current && dataChannelRef.current.readyState === "open") {
+            const message = {
+                type: "raise-hand",
+                userName: localUserName,
+            };
+            dataChannelRef.current.send(JSON.stringify(message));
+        } else {
+            console.warn("DataChannel is not open. Cannot send raise hand message.");
+        }
     };
 
     const sendMessage = () => {
@@ -375,6 +467,33 @@ const RoomPage = () => {
         });
         console.log("Reaction sent:", emoji);
     }
+
+    const toggleNoiseCancellation = async () => {
+        if (!localStream || !peerRef.current) return;
+
+        const nextState = !isNoiseCancellationOn;
+        setIsNoiseCancellationOn(nextState);
+
+        const {
+            finalAudioTrack,
+        } = await processAudioWithRNNoise(
+            localStream,
+            nextState
+        );
+
+        const sender = peerRef.current
+            .getSenders()
+            .find((s) => s.track?.kind === "audio");
+
+        if (sender) {
+            await sender.replaceTrack(finalAudioTrack);
+        }
+
+        console.log(
+            "Noise Cancellation:",
+            nextState ? "ON" : "OFF"
+        );
+    };
 
     return (
         <div className="w-full h-screen bg-gray-950 flex overflow-hidden">
@@ -435,6 +554,8 @@ const RoomPage = () => {
                     unreadCount={unreadCount}
                     isChatOpened={isChatOpen}
                     sendReaction={sendReaction}
+                    isNoiseCancellationOn={isNoiseCancellationOn}
+                    toggleNoiseCancellation={toggleNoiseCancellation}
                 />
             </div>
 

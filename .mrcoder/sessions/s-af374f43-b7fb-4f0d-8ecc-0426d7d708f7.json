@@ -1,0 +1,32 @@
+{
+  "id": "s-af374f43-b7fb-4f0d-8ecc-0426d7d708f7",
+  "title": "hey",
+  "providerId": "kilo",
+  "model": "kilo/stepfun/step-3.5-flash:free",
+  "permissionMode": "default",
+  "createdAt": "2026-04-24T11:20:14.162Z",
+  "updatedAt": "2026-04-24T11:20:31.168Z",
+  "messages": [
+    {
+      "kind": "user",
+      "id": "f8c2d03b-e9e6-4ada-99f6-a59aef04f613",
+      "timestamp": "2026-04-24T11:20:14.341Z",
+      "text": "hey",
+      "attachments": [],
+      "turnId": "e0da1bf0-f298-4fee-805f-76c77309f15d"
+    },
+    {
+      "kind": "assistant",
+      "id": "99b08b05-9c81-4338-a7e1-c3a62b56da53",
+      "timestamp": "2026-04-24T11:20:31.168Z",
+      "text": "Hi"
+    }
+  ],
+  "totalUsage": {
+    "input": 10725,
+    "output": -8
+  },
+  "lastContextFraction": 0.040912628173828125,
+  "autoCompactTriggered": false,
+  "sdkSessionId": "ses_240c7e2b0ffepG9p224JLEV9m0"
+}

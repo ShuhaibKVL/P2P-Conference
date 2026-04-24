@@ -9,7 +9,8 @@ import {
     MonitorOff,
     Hand,
     MessageSquare,
-    Smile
+    Smile,
+    Sparkles
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -27,6 +28,8 @@ type Props = {
     toggleChat: () => void;
     sendReaction: (emoji: string) => void;
     unreadCount?: number;
+    isNoiseCancellationOn: boolean;
+    toggleNoiseCancellation: () => void;
 };
 
 const MeetingControls = ({
@@ -34,6 +37,7 @@ const MeetingControls = ({
     isCameraOff,
     isScreenSharing,
     isChatOpened,
+    isNoiseCancellationOn,
     toggleMic,
     toggleCamera,
     toggleScreenShare,
@@ -42,6 +46,8 @@ const MeetingControls = ({
     raiseHand,
     toggleChat,
     sendReaction,
+    toggleNoiseCancellation,
+
     unreadCount = 0,
 }: Props) => {
     const [showReactions, setShowReactions] = useState(false);
@@ -104,6 +110,30 @@ const MeetingControls = ({
                 </button>
 
                 <button
+                    onClick={toggleNoiseCancellation}
+                    className={`px-5 py-3 rounded-2xl transition ${isNoiseCancellationOn
+                        ? "bg-green-600 hover:bg-green-500"
+                        : "bg-slate-800 hover:bg-slate-700"
+                        }`}
+                    title={
+                        isNoiseCancellationOn
+                            ? "Noise Cancellation ON"
+                            : "Noise Cancellation OFF"
+                    }
+                >
+                    <div className="relative">
+                        <Mic size={20} />
+
+                        {isNoiseCancellationOn && (
+                            <Sparkles
+                                size={12}
+                                className="absolute -top-1 -right-1"
+                            />
+                        )}
+                    </div>
+                </button>
+
+                <button
                     onClick={toggleCamera}
                     className="px-5 py-3 rounded-2xl bg-slate-800 text-white hover:bg-slate-700 transition"
                 >
@@ -147,7 +177,7 @@ const MeetingControls = ({
                     onClick={() => setShowReactions((prev) => !prev)}
                     className="p-3 rounded-full bg-slate-800 hover:bg-slate-700 transition"
                 >
-                    <Smile size={18} />
+                    😁
                 </button>
 
                 <div className="relative" onClick={toggleChat}>
