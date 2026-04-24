@@ -1,6 +1,7 @@
 "use client";
 
 import { X } from "lucide-react";
+import TypingIndicator from "./TypingIndicator";
 
 type MessageType = {
     userName: string;
@@ -65,9 +66,7 @@ const ChatDrawer = ({
                 ))}
 
                 {isTyping && (
-                    <div className="px-4 pb-2 text-sm text-gray-400 animate-pulse">
-                        typing...
-                    </div>
+                    <TypingIndicator />
                 )}
             </div>
 
